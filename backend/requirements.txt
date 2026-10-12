@@ -1,0 +1,11 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.4.0
+httpx>=0.25.0
+requests>=2.31.0
+shapely>=2.0.0
+geopandas>=0.14.0
+psycopg2-binary>=2.9.9
+SQLAlchemy>=2.0.23
+GeoAlchemy2>=0.14.2
+pytest>=7.4.0

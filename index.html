@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoLens – Geospatial Environmental Intelligence</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet Draw -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <!-- App styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Draw -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- jsPDF for report export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════ TOP NAV ═══════════════════════════ -->
+<header class="topnav">
+  <div class="topnav-brand">
+    <div class="brand-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+    </div>
+    <span class="brand-name">GeoLens</span>
+    <span class="brand-tag">Environmental Intelligence</span>
+  </div>
+
+  <div class="topnav-search">
+    <div class="search-wrap">
+      <i data-lucide="search" class="search-icon"></i>
+      <input id="locationSearch" type="text" placeholder="Search location, city, coordinates…" autocomplete="off" />
+      <button id="gpsBtn" class="btn-icon" title="Use my location">
+        <i data-lucide="locate"></i>
+      </button>
+    </div>
+    <div id="searchSuggestions" class="search-suggestions hidden"></div>
+  </div>
+
+  <div class="topnav-actions">
+    <button id="alertsBtn" class="btn-icon alert-badge" title="Alert Center">
+      <i data-lucide="bell"></i>
+      <span class="badge" id="alertCount">3</span>
+    </button>
+    <button id="themeToggle" class="btn-icon" title="Toggle theme">
+      <i data-lucide="sun"></i>
+    </button>
+    <button id="reportBtn" class="btn-primary">
+      <i data-lucide="file-text"></i> Export Report
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ MAIN LAYOUT ════════════════════════ -->
+<main class="app-main">
+
+  <!-- ──────────── LEFT CONTROL SIDEBAR ──────────── -->
+  <aside id="sidebar" class="sidebar">
+    <button id="sidebarToggle" class="sidebar-toggle" title="Collapse sidebar">
+      <i data-lucide="panel-left-close"></i>
+    </button>
+
+    <!-- SECTION: LAYERS -->
+    <section class="sidebar-section">
+      <h3 class="section-title"><i data-lucide="layers"></i> Map Layers</h3>
+      <div class="layer-list">
+        <label class="layer-item active" data-layer="satellite">
+          <input type="radio" name="baseLayer" value="satellite" checked />
+          <span class="layer-dot" style="background:#4A9EFF"></span>
+          <span>Optical Satellite</span>
+        </label>
+        <label class="layer-item" data-layer="ndvi">
+          <input type="radio" name="baseLayer" value="ndvi" />
+          <span class="layer-dot" style="background:#4CAF50"></span>
+          <span>NDVI Vegetation</span>
+        </label>
+        <label class="layer-item" data-layer="soilMoisture">
+          <input type="radio" name="baseLayer" value="soilMoisture" />
+          <span class="layer-dot" style="background:#8B5A2B"></span>
+          <span>Soil Moisture</span>
+        </label>
+        <label class="layer-item" data-layer="precipitation">
+          <input type="radio" name="baseLayer" value="precipitation" />
+          <span class="layer-dot" style="background:#2196F3"></span>
+          <span>Precipitation</span>
+        </label>
+        <label class="layer-item" data-layer="thermal">
+          <input type="radio" name="baseLayer" value="thermal" />
+          <span class="layer-dot" style="background:#FF5722"></span>
+          <span>Thermal Anomalies</span>
+        </label>
+      </div>
+
+      <div class="overlay-toggles">
+        <h4 class="sub-section-title">Overlay Layers</h4>
+        <label class="toggle-item">
+          <input type="checkbox" id="overlayFlood" />
+          <span class="toggle-pill"></span>
+          <span>Flood Extent</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="overlayLanduse" checked />
+          <span class="toggle-pill"></span>
+          <span>Land Use Zones</span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="overlayRisk" />
+          <span class="toggle-pill"></span>
+          <span>Risk Heatmap</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- SECTION: TIME CONTROLS -->
+    <section class="sidebar-section">
+      <h3 class="section-title"><i data-lucide="calendar"></i> Time Range</h3>
+      <div class="time-controls">
+        <div class="date-field">
+          <label>From</label>
+          <input type="date" id="dateFrom" value="2018-01-01" />
+        </div>
+        <div class="date-field">
+          <label>To</label>
+          <input type="date" id="dateTo" value="2026-01-01" />
+        </div>
+      </div>
+      <div class="year-slider-wrap">
+        <label>Year: <span id="yearLabel">2026</span></label>
+        <input type="range" id="yearSlider" min="2015" max="2026" value="2026" class="year-slider" />
+        <div class="slider-range-labels"><span>2015</span><span>2026</span></div>
+      </div>
+      <div class="playback-controls">
+        <button id="playBtn" class="btn-icon-sm" title="Play time-lapse">
+          <i data-lucide="play"></i>
+        </button>
+        <button id="pauseBtn" class="btn-icon-sm hidden" title="Pause">
+          <i data-lucide="pause"></i>
+        </button>
+        <button id="compareBtn" class="btn-secondary w-full">
+          <i data-lucide="git-compare"></i> Split Compare
+        </button>
+      </div>
+    </section>
+
+    <!-- SECTION: DRAWING TOOLS -->
+    <section class="sidebar-section">
+      <h3 class="section-title"><i data-lucide="pen-tool"></i> Area Selection</h3>
+      <div class="draw-tools">
+        <button id="drawPolygon" class="btn-tool">
+          <i data-lucide="pentagon"></i> Draw Polygon
+        </button>
+        <button id="drawRectangle" class="btn-tool">
+          <i data-lucide="square"></i> Draw Rectangle
+        </button>
+        <button id="clearDraw" class="btn-tool btn-danger-subtle">
+          <i data-lucide="trash-2"></i> Clear Selection
+        </button>
+      </div>
+      <div class="upload-zone" id="uploadZone">
+        <i data-lucide="upload-cloud"></i>
+        <span>Upload GeoJSON / KML</span>
+        <input type="file" id="geoUpload" accept=".geojson,.kml,.json" />
+      </div>
+    </section>
+
+    <!-- SECTION: VULNERABILITY INDEX -->
+    <section class="sidebar-section">
+      <h3 class="section-title"><i data-lucide="shield-alert"></i> Vulnerability Index</h3>
+      <div class="vuln-score-wrap">
+        <div class="vuln-donut" id="vulnDonut">
+          <svg viewBox="0 0 100 100" class="donut-svg">
+            <circle class="donut-track" cx="50" cy="50" r="38" />
+            <circle class="donut-fill" id="donutFill" cx="50" cy="50" r="38"
+              stroke-dasharray="0 239" stroke-dashoffset="60" />
+          </svg>
+          <div class="donut-center">
+            <span class="donut-value" id="vulnValue">67</span>
+            <span class="donut-label">/100</span>
+          </div>
+        </div>
+        <div class="vuln-breakdown">
+          <div class="vuln-factor">
+            <span>Rainfall Volatility</span>
+            <div class="factor-bar"><div class="factor-fill" style="width:72%;background:#2196F3"></div></div>
+            <span class="factor-pct">72%</span>
+          </div>
+          <div class="vuln-factor">
+            <span>Canopy Loss</span>
+            <div class="factor-bar"><div class="factor-fill" style="width:58%;background:#4CAF50"></div></div>
+            <span class="factor-pct">58%</span>
+          </div>
+          <div class="vuln-factor">
+            <span>Terrain Risk</span>
+            <div class="factor-bar"><div class="factor-fill" style="width:81%;background:#FF5722"></div></div>
+            <span class="factor-pct">81%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: ALERT CONFIG -->
+    <section class="sidebar-section">
+      <h3 class="section-title"><i data-lucide="sliders"></i> Alert Thresholds</h3>
+      <div class="threshold-item">
+        <label>NDVI Drop Alert <span id="ndviThreshVal">15%</span></label>
+        <input type="range" min="5" max="50" value="15" class="threshold-slider" id="ndviThresh" />
+      </div>
+      <div class="threshold-item">
+        <label>Soil Moisture Drop <span id="soilThreshVal">20%</span></label>
+        <input type="range" min="5" max="50" value="20" class="threshold-slider" id="soilThresh" />
+      </div>
+      <div class="threshold-item">
+        <label>Flood Risk Score <span id="floodThreshVal">65</span></label>
+        <input type="range" min="30" max="95" value="65" class="threshold-slider" id="floodThresh" />
+      </div>
+      <button id="saveThresholds" class="btn-secondary w-full mt-sm">
+        <i data-lucide="save"></i> Save Thresholds
+      </button>
+    </section>
+  </aside>
+
+  <!-- ──────────── MAP CANVAS ──────────── -->
+  <div class="map-container" id="mapContainer">
+    <div id="map"></div>
+
+    <!-- Map overlay: layer legend -->
+    <div class="map-legend" id="mapLegend">
+      <h4 id="legendTitle">Optical Satellite</h4>
+      <div id="legendItems" class="legend-items"></div>
+    </div>
+
+    <!-- Map overlay: split compare label -->
+    <div class="split-labels hidden" id="splitLabels">
+      <span class="split-label left">◀ 2018</span>
+      <div class="split-divider"></div>
+      <span class="split-label right">2026 ▶</span>
+    </div>
+
+    <!-- Anomaly badge -->
+    <div class="anomaly-badge" id="anomalyBadge">
+      <i data-lucide="alert-triangle"></i>
+      <span id="anomalyText">3 anomalies detected in selected area</span>
+    </div>
+
+    <!-- Analytics drawer toggle -->
+    <button class="drawer-pull" id="drawerPull">
+      <i data-lucide="chevron-up"></i>
+      <span>Environmental Analytics</span>
+      <i data-lucide="chevron-up"></i>
+    </button>
+  </div>
+</main>
+
+<!-- ═══════════════════════════ ANALYTICS DRAWER ═══════════════════ -->
+<div class="analytics-drawer" id="analyticsDrawer">
+  <div class="drawer-header">
+    <div class="drawer-tabs">
+      <button class="tab-btn active" data-tab="timeseries">
+        <i data-lucide="trending-up"></i> Time Series
+      </button>
+      <button class="tab-btn" data-tab="correlation">
+        <i data-lucide="git-merge"></i> Correlations
+      </button>
+      <button class="tab-btn" data-tab="changedetect">
+        <i data-lucide="scan-search"></i> Change Detection
+      </button>
+      <button class="tab-btn" data-tab="datatable">
+        <i data-lucide="table"></i> Data Table
+      </button>
+    </div>
+    <button class="drawer-close" id="drawerClose">
+      <i data-lucide="chevron-down"></i>
+    </button>
+  </div>
+
+  <!-- TAB: TIME SERIES -->
+  <div class="tab-content active" id="tab-timeseries">
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h4>NDVI Trend (Vegetation Health)</h4>
+          <span class="change-badge negative">▼ 18.3% vs 5yr avg</span>
+        </div>
+        <canvas id="ndviChart" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h4>Precipitation (mm/month)</h4>
+          <span class="change-badge positive">▲ 12.1% anomaly</span>
+        </div>
+        <canvas id="precipChart" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h4>Surface Temperature (°C)</h4>
+          <span class="change-badge negative">▼ +2.4°C above baseline</span>
+        </div>
+        <canvas id="tempChart" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h4>Soil Moisture Index</h4>
+          <span class="change-badge negative">▼ 18% below 5yr avg</span>
+        </div>
+        <canvas id="soilChart" height="130"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: CORRELATION -->
+  <div class="tab-content" id="tab-correlation">
+    <div class="correlation-grid">
+      <div class="corr-card high-risk">
+        <div class="corr-icon"><i data-lucide="cloud-rain"></i></div>
+        <div class="corr-body">
+          <h4>Flood Vulnerability</h4>
+          <p>High rainfall volatility (+31%) combined with 22% deforestation in riparian zones elevates flood risk to <strong>CRITICAL</strong>.</p>
+          <div class="corr-factors">
+            <span class="factor-tag rain">Rainfall ▲</span>
+            <span class="factor-tag forest">Canopy ▼</span>
+            <span class="factor-tag soil">Soil Sat.</span>
+          </div>
+        </div>
+        <div class="risk-score high">87</div>
+      </div>
+      <div class="corr-card medium-risk">
+        <div class="corr-icon"><i data-lucide="mountain"></i></div>
+        <div class="corr-body">
+          <h4>Landslide Potential</h4>
+          <p>Saturated slopes with 15% reduction in root-binding vegetation and steep terrain (>35°) indicate elevated slide probability.</p>
+          <div class="corr-factors">
+            <span class="factor-tag soil">Soil Moist.</span>
+            <span class="factor-tag forest">Veg ▼</span>
+            <span class="factor-tag terrain">Terrain</span>
+          </div>
+        </div>
+        <div class="risk-score medium">64</div>
+      </div>
+      <div class="corr-card low-risk">
+        <div class="corr-icon"><i data-lucide="thermometer-sun"></i></div>
+        <div class="corr-body">
+          <h4>Heat Island Effect</h4>
+          <p>Urban expansion of 14% in peri-urban zone correlates with +2.1°C microclimate anomaly and reduced albedo values.</p>
+          <div class="corr-factors">
+            <span class="factor-tag urban">Urban ▲</span>
+            <span class="factor-tag temp">Temp ▲</span>
+            <span class="factor-tag ndvi">NDVI ▼</span>
+          </div>
+        </div>
+        <div class="risk-score low">41</div>
+      </div>
+      <div class="corr-card medium-risk">
+        <div class="corr-icon"><i data-lucide="leaf"></i></div>
+        <div class="corr-body">
+          <h4>Desertification Risk</h4>
+          <p>Sustained soil moisture deficit (18% below avg) paired with NDVI decline signals early-stage land degradation.</p>
+          <div class="corr-factors">
+            <span class="factor-tag soil">Soil ▼</span>
+            <span class="factor-tag ndvi">NDVI ▼</span>
+            <span class="factor-tag rain">Precip ▼</span>
+          </div>
+        </div>
+        <div class="risk-score medium">58</div>
+      </div>
+    </div>
+    <div class="disclaimer-banner">
+      <strong>Analytical Disclaimer:</strong> Highlighted relationships represent statistical correlations and spatial overlap for investigation—not definitive causal proof.
+    </div>
+  </div>
+
+  <!-- TAB: CHANGE DETECTION -->
+  <div class="tab-content" id="tab-changedetect">
+    <div class="change-detect-layout">
+      <div class="change-summary">
+        <div id="seasonalGuardrailCard"></div>
+        <h4>Detected Changes — Selected Region (2018 → 2026)</h4>
+        <div class="change-items">
+          <div class="change-item detected">
+            <i data-lucide="tree-pine"></i>
+            <div>
+              <strong>Forest Cover Loss</strong>
+              <span>32.4% reduction in canopy density detected over 3 years (2021–2024)</span>
+            </div>
+            <span class="change-pct negative">-32.4%</span>
+          </div>
+          <div class="change-item detected">
+            <i data-lucide="droplets"></i>
+            <div>
+              <strong>Soil Moisture Depletion</strong>
+              <span>Soil moisture index dropped 18% below the 5-year baseline average</span>
+            </div>
+            <span class="change-pct negative">-18.0%</span>
+          </div>
+          <div class="change-item detected">
+            <i data-lucide="building-2"></i>
+            <div>
+              <strong>Urban Expansion</strong>
+              <span>Built-up area expanded by 14.2 km² in the western corridor since 2020</span>
+            </div>
+            <span class="change-pct positive">+14.2 km²</span>
+          </div>
+          <div class="change-item detected">
+            <i data-lucide="thermometer"></i>
+            <div>
+              <strong>Surface Temperature Rise</strong>
+              <span>Land surface temperature increased +2.4°C above the 10-year average</span>
+            </div>
+            <span class="change-pct negative">+2.4°C</span>
+          </div>
+          <div class="change-item detected">
+            <i data-lucide="waves"></i>
+            <div>
+              <strong>Wetland Shrinkage</strong>
+              <span>Northern wetland extent reduced by 8.7% since 2019</span>
+            </div>
+            <span class="change-pct negative">-8.7%</span>
+          </div>
+        </div>
+      </div>
+      <div class="change-chart-wrap">
+        <h4>Land Cover Transition Matrix</h4>
+        <canvas id="landcoverChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: DATA TABLE -->
+  <div class="tab-content" id="tab-datatable">
+    <div class="table-controls">
+      <input type="text" id="tableSearch" placeholder="Filter records…" class="table-search" />
+      <button class="btn-secondary" id="downloadCSV">
+        <i data-lucide="download"></i> Download CSV
+      </button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="envDataTable">
+        <thead>
+          <tr>
+            <th>Year</th>
+            <th>NDVI</th>
+            <th>Precipitation (mm)</th>
+            <th>Temp (°C)</th>
+            <th>Soil Moisture</th>
+            <th>Forest Cover %</th>
+            <th>Urban Area km²</th>
+            <th>Vuln. Index</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ ALERT CENTER ═══════════════════════ -->
+<div class="alert-panel hidden" id="alertPanel">
+  <div class="alert-panel-header">
+    <h3><i data-lucide="bell-ring"></i> Alert Center</h3>
+    <button id="alertPanelClose"><i data-lucide="x"></i></button>
+  </div>
+  <div class="alert-list">
+    <div class="alert-item critical">
+      <div class="alert-indicator"></div>
+      <div class="alert-content">
+        <strong>CRITICAL: Flood Risk Threshold Breached</strong>
+        <p>Vulnerability score hit 87/100 in Zone A. Immediate assessment recommended.</p>
+        <time>12 Oct 2026, 14:32</time>
+      </div>
+      <button class="alert-dismiss"><i data-lucide="x"></i></button>
+    </div>
+    <div class="alert-item warning">
+      <div class="alert-indicator"></div>
+      <div class="alert-content">
+        <strong>WARNING: NDVI Drop Detected</strong>
+        <p>Vegetation index dropped 21% in Northern Sector — exceeds 15% threshold.</p>
+        <time>11 Oct 2026, 09:15</time>
+      </div>
+      <button class="alert-dismiss"><i data-lucide="x"></i></button>
+    </div>
+    <div class="alert-item info">
+      <div class="alert-indicator"></div>
+      <div class="alert-content">
+        <strong>INFO: Soil Moisture Update</strong>
+        <p>Monthly soil moisture report available for selected region.</p>
+        <time>10 Oct 2026, 06:00</time>
+      </div>
+      <button class="alert-dismiss"><i data-lucide="x"></i></button>
+    </div>
+  </div>
+  <button class="btn-secondary w-full" id="configAlertsBtn">
+    <i data-lucide="settings"></i> Configure Alert Rules
+  </button>
+</div>
+
+<!-- ═══════════════════════════ COMPARE MODAL ════════════════════════ -->
+<div class="modal-overlay hidden" id="compareModal">
+  <div class="modal compare-modal">
+    <div class="modal-header">
+      <h3><i data-lucide="git-compare"></i> Split-Screen Comparison</h3>
+      <button class="modal-close" id="compareModalClose"><i data-lucide="x"></i></button>
+    </div>
+    <div class="compare-maps-wrap">
+      <div class="compare-map-side">
+        <div class="compare-label">2018 — Historical</div>
+        <div id="mapBefore" class="compare-map-canvas"></div>
+      </div>
+      <div class="compare-divider">
+        <div class="compare-handle">◀ ▶</div>
+      </div>
+      <div class="compare-map-side">
+        <div class="compare-label">2026 — Current</div>
+        <div id="mapAfter" class="compare-map-canvas"></div>
+      </div>
+    </div>
+    <div class="compare-stats">
+      <div class="cstat"><span class="cstat-label">Forest Cover</span><span class="cstat-val negative">-32.4%</span></div>
+      <div class="cstat"><span class="cstat-label">Urban Area</span><span class="cstat-val positive">+14.2 km²</span></div>
+      <div class="cstat"><span class="cstat-label">Avg NDVI</span><span class="cstat-val negative">-0.18</span></div>
+      <div class="cstat"><span class="cstat-label">Surface Temp</span><span class="cstat-val negative">+2.4°C</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ REPORT MODAL ═════════════════════════ -->
+<div class="modal-overlay hidden" id="reportModal">
+  <div class="modal report-modal">
+    <div class="modal-header">
+      <h3><i data-lucide="file-text"></i> Export Environmental Report</h3>
+      <button class="modal-close" id="reportModalClose"><i data-lucide="x"></i></button>
+    </div>
+    <div class="report-options">
+      <label class="report-check"><input type="checkbox" checked /> Include Time-Series Charts</label>
+      <label class="report-check"><input type="checkbox" checked /> Include Change Detection Summary</label>
+      <label class="report-check"><input type="checkbox" checked /> Include Vulnerability Index</label>
+      <label class="report-check"><input type="checkbox" checked /> Include Correlation Analysis</label>
+      <label class="report-check"><input type="checkbox" /> Include Raw Data Tables</label>
+    </div>
+    <div class="report-format">
+      <label>Format:</label>
+      <select id="reportFormat">
+        <option value="pdf">PDF Report</option>
+        <option value="geojson">GeoJSON Data</option>
+        <option value="csv">CSV Dataset</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="reportModalClose2">Cancel</button>
+      <button class="btn-primary" id="generateReport">
+        <i data-lucide="download"></i> Generate &amp; Download
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notifications -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- App scripts -->
+<script src="data/mockData.js"></script>
+<script src="map.js"></script>
+<script src="charts.js"></script>
+<script src="ui.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
