@@ -1370,3 +1370,80 @@ strong { color: var(--text-primary); }
   font-size: 10px;
   color: var(--text-muted);
 }
+
+/* Active Location Pulsing Pin */
+.active-location-pin {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pin-core {
+  width: 14px;
+  height: 14px;
+  background: var(--accent-blue);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(74, 158, 255, 0.9);
+  z-index: 2;
+}
+.pin-pulse {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(74, 158, 255, 0.4);
+  animation: pinPulse 2s ease-out infinite;
+  z-index: 1;
+}
+@keyframes pinPulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Inline Dynamic API Notices */
+.inline-api-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+.inline-api-notice.fallback {
+  background: rgba(240, 136, 62, 0.15);
+  border: 1px solid rgba(240, 136, 62, 0.4);
+  color: var(--accent-amber);
+}
+.inline-api-notice.live {
+  background: rgba(63, 185, 80, 0.15);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+  color: var(--accent-green);
+}
+
+/* Mandatory Satellite Disclaimer Note */
+.satellite-disclaimer-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: var(--bg-surface-2);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent-blue);
+  line-height: 1.4;
+}
+
+/* Chart Data Provenance Subheader */
+.chart-provenance {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -4px;
+}

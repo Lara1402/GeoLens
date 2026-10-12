@@ -337,10 +337,108 @@ window.GeoLensCharts = (() => {
     });
   }
 
-  // ─── Update charts when location changes ─────────────────────────
-  function updateCharts(locIndex) {
-    initCharts(locIndex);
-    populateDataTable(locIndex);
+  // ─── Update charts dynamically when location changes ─────────────
+  async function updateCharts(target) {
+    let lat = 26.8, lng = 80.9, locIndex = 5;
+    if (typeof target === 'number') {
+      locIndex = target;
+      const loc = GeoLensData.LOCATIONS[locIndex] || GeoLensData.LOCATIONS[0];
+      lat = loc.lat;
+      lng = loc.lng;
+    } else if (target && typeof target === 'object') {
+      lat = target.lat || 26.8;
+      lng = target.lng || 80.9;
+    }
+
+    // 1. Fetch real Open-Meteo live weather & historical climate
+    let liveWeather = null;
+    let histWeather = null;
+    if (window.GeoLensWeather) {
+      [liveWeather, histWeather] = await Promise.all([
+        window.GeoLensWeather.fetchLiveWeather(lat, lng),
+        window.GeoLensWeather.fetchHistoricalTrend(lat, lng)
+      ]);
+    }
+
+    // 2. Fetch satellite observation baseline
+    let satData = null;
+    if (window.GeoLensSatellite) {
+      satData = await window.GeoLensSatellite.fetchSatelliteData(lat, lng, '2026-10-01');
+    }
+
+    // 3. Build merged series for charts & table
+    const baseSeries = GeoLensData.generateTimeSeries(locIndex);
+    const mergedSeries = baseSeries.map((d, i) => {
+      const histItem = histWeather?.series?.[i];
+      return {
+        ...d,
+        temp: histItem ? histItem.temp : d.temp,
+        precip: histItem ? histItem.precip : d.precip,
+        soil: histItem ? histItem.soil : d.soil,
+        ndvi: (i === baseSeries.length - 1 && satData?.ndviMean) ? satData.ndviMean : d.ndvi
+      };
+    });
+
+    const labels = mergedSeries.map(d => String(d.year));
+
+    // 4. Update the Chart.js instances
+    initNDVIChart(labels, mergedSeries);
+    initPrecipChart(labels, mergedSeries);
+    initTempChart(labels, mergedSeries);
+    initSoilChart(labels, mergedSeries);
+    initLandCoverChart();
+    populateDataTableWithSeries(mergedSeries);
+
+    // 5. Update header badges and provenance citations
+    updateChartHeaders(liveWeather, histWeather, satData);
+  }
+
+  function updateChartHeaders(liveWeather, histWeather, satData) {
+    const ndviBadge = document.getElementById('ndviBadge');
+    const precipBadge = document.getElementById('precipBadge');
+    const tempBadge = document.getElementById('tempBadge');
+    const soilBadge = document.getElementById('soilBadge');
+
+    const ndviProv = document.getElementById('ndviProv');
+    const precipProv = document.getElementById('precipProv');
+    const tempProv = document.getElementById('tempProv');
+    const soilProv = document.getElementById('soilProv');
+
+    if (liveWeather) {
+      if (tempBadge) {
+        tempBadge.textContent = `${liveWeather.temperature > 0 ? '+' : ''}${liveWeather.temperature}°C (Live)`;
+        tempBadge.className = `change-badge ${liveWeather.temperature > 32 ? 'negative' : 'positive'}`;
+      }
+      if (tempProv) {
+        tempProv.textContent = `Source: ${liveWeather.sourceProvider} | Observed: ${liveWeather.observationDate}`;
+      }
+
+      if (soilBadge) {
+        soilBadge.textContent = `${liveWeather.soilMoisture0_7}% (0–7cm)`;
+        soilBadge.className = `change-badge ${liveWeather.soilMoisture0_7 < 25 ? 'negative' : 'positive'}`;
+      }
+      if (soilProv) {
+        soilProv.textContent = `Source: Open-Meteo Volumetric (0–7cm) | Observed: ${liveWeather.observationDate}`;
+      }
+
+      if (precipBadge) {
+        precipBadge.textContent = `${liveWeather.precipitationWeek} mm (7-day sum)`;
+        precipBadge.className = 'change-badge positive';
+      }
+      if (precipProv) {
+        precipProv.textContent = `Source: ${histWeather?.sourceProvider || 'Open-Meteo ERA5 Reanalysis'} | 2015–2026`;
+      }
+    }
+
+    if (satData) {
+      if (ndviBadge) {
+        ndviBadge.textContent = `NDVI: ${satData.ndviMean} (${satData.cloudCoverPct}% Cloud)`;
+        ndviBadge.className = `change-badge ${satData.ndviMean > 0.5 ? 'positive' : 'negative'}`;
+      }
+      if (ndviProv) {
+        ndviProv.textContent = `Source: ${satData.sourceProvider} | Observed: ${satData.observationDate}`;
+      }
+    }
   }
 
   // ─── Update theme (dark ↔ light) ─────────────────────────────────
@@ -366,6 +464,10 @@ window.GeoLensCharts = (() => {
   // ─── Populate data table ─────────────────────────────────────────
   function populateDataTable(locIndex) {
     const series = GeoLensData.generateTimeSeries(locIndex);
+    populateDataTableWithSeries(series);
+  }
+
+  function populateDataTableWithSeries(series) {
     const tbody = document.getElementById('tableBody');
     if (!tbody) return;
 
@@ -396,5 +498,6 @@ window.GeoLensCharts = (() => {
     updateCharts,
     refreshTheme,
     populateDataTable,
+    populateDataTableWithSeries
   };
 })();

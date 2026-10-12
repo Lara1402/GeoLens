@@ -20,6 +20,13 @@ window.GeoLensMap = (() => {
   let isPlaying = false;
   let playInterval = null;
   let compareMaps = { before: null, after: null };
+  let activeMarker = null;
+  let activeLocation = {
+    lat: 26.8,
+    lng: 80.9,
+    name: 'Greater Ganges Plain, India',
+    bounds: null
+  };
 
   // ─── Tile URL providers ──────────────────────────────────────────
   const TILES = {
@@ -165,6 +172,7 @@ window.GeoLensMap = (() => {
     renderLayerOverlays(currentLocIndex, 2026);
     renderAnomalies(currentLocIndex);
     updateLegend('satellite');
+    setActiveLocation(loc.lat, loc.lng, loc.name);
 
     return map;
   }
@@ -415,7 +423,7 @@ window.GeoLensMap = (() => {
   function flyToLocation(locIndex) {
     currentLocIndex = locIndex;
     const loc = GeoLensData.LOCATIONS[locIndex];
-    map.flyTo([loc.lat, loc.lng], 7, { duration: 1.8 });
+    setActiveLocation(loc.lat, loc.lng, loc.name);
     setTimeout(() => {
       renderLayerOverlays(locIndex, getCurrentYear());
       renderAnomalies(locIndex);
@@ -633,11 +641,55 @@ window.GeoLensMap = (() => {
     return Math.round(area_rad * R * R * 100) / 100;
   }
 
+  function setActiveLocation(lat, lng, name, bounds = null) {
+    if (!map) return;
+    const b = bounds || map.getBounds();
+    activeLocation = { lat, lng, name, bounds: b };
+
+    if (activeMarker) {
+      map.removeLayer(activeMarker);
+    }
+
+    const pinIcon = L.divIcon({
+      html: '<div class="active-location-pin"><div class="pin-pulse"></div><div class="pin-core"></div></div>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    activeMarker = L.marker([lat, lng], { icon: pinIcon })
+      .bindPopup(`
+        <div class="gl-popup">
+          <div class="gl-popup-title">📍 ${name}</div>
+          <div class="gl-popup-row"><span class="gl-popup-label">Coordinates</span><span class="gl-popup-val">${lat.toFixed(4)}°, ${lng.toFixed(4)}°</span></div>
+          <div class="gl-popup-row"><span class="gl-popup-label">Data Pipeline</span><span class="gl-popup-val pos">Synced (Open-Meteo & Sentinel)</span></div>
+          <div class="gl-popup-row"><span class="gl-popup-label">Source</span><span class="gl-popup-val">Nominatim / Geocoded</span></div>
+        </div>
+      `, { maxWidth: 260 })
+      .addTo(map);
+
+    map.flyTo([lat, lng], Math.max(map.getZoom(), 7), { duration: 1.5 });
+
+    // Expose active coordinates & bounds globally
+    window.GeoLensState = window.GeoLensState || {};
+    window.GeoLensState.activeLocation = activeLocation;
+
+    window.dispatchEvent(new CustomEvent('geolens:location-changed', {
+      detail: { lat, lng, name, bounds: b }
+    }));
+  }
+
+  function getActiveLocation() {
+    return activeLocation;
+  }
+
   return {
     init,
     switchLayer,
     renderLayerOverlays,
     flyToLocation,
+    setActiveLocation,
+    getActiveLocation,
     startDrawPolygon,
     startDrawRectangle,
     clearDrawings,

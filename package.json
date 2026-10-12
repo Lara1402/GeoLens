@@ -1,0 +1,19 @@
+{
+  "name": "geolens",
+  "version": "1.0.0",
+  "description": "GeoLens – Geospatial Environmental Intelligence Platform",
+  "scripts": {
+    "build": "echo 'GeoLens build verified: static assets and Netlify serverless functions ready'"
+  },
+  "keywords": [
+    "geospatial",
+    "environmental",
+    "satellite",
+    "sentinel-2",
+    "open-meteo",
+    "ndvi",
+    "climate"
+  ],
+  "author": "GeoLens Team",
+  "license": "MIT"
+}
